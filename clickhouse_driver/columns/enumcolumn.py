@@ -34,8 +34,19 @@ class EnumColumn(IntColumn):
                 .format(source_value, enum_str)
             )
 
-    def after_read_item(self, value):
-        return self.enum_cls(value).name
+    def after_read_items(self, items, nulls_map=None):
+        enum_cls = self.enum_cls
+
+        if nulls_map is not None:
+            items = tuple([
+                (None if is_null else enum_cls(items[i]).name)
+                for i, is_null in enumerate(nulls_map)
+            ])
+
+        else:
+            items = tuple([enum_cls(x).name for x in items])
+
+        return items
 
 
 class Enum8Column(EnumColumn):

@@ -35,8 +35,17 @@ class UUIDColumn(FormatColumn):
 
         return uint_128_items
 
-    def after_read_item(self, value):
-        return UUID(int=value)
+    def after_read_items(self, items, nulls_map=None):
+        if nulls_map is not None:
+            items = tuple([
+                (None if is_null else UUID(int=items[i]))
+                for i, is_null in enumerate(nulls_map)
+            ])
+
+        else:
+            items = tuple([UUID(int=x) for x in items])
+
+        return items
 
     def before_write_item(self, value):
         try:

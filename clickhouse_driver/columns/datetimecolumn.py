@@ -16,9 +16,20 @@ class DateTimeColumn(FormatColumn):
         self.timezone = timezone
         super(DateTimeColumn, self).__init__(**kwargs)
 
-    def after_read_item(self, value):
-        dt = datetime.fromtimestamp(value, self.timezone)
-        return dt.replace(tzinfo=None)
+    def after_read_items(self, items, nulls_map=None):
+        fts = datetime.fromtimestamp
+        tz = self.timezone
+
+        if nulls_map is not None:
+            items = tuple([
+                (None if is_null else fts(items[i], tz).replace(tzinfo=None))
+                for i, is_null in enumerate(nulls_map)
+            ])
+
+        else:
+            items = tuple([fts(x, tz).replace(tzinfo=None) for x in items])
+
+        return items
 
     def before_write_item(self, value):
         if isinstance(value, int):

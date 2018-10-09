@@ -26,20 +26,39 @@ class DecimalColumn(FormatColumn):
             self.check_item = check_item
 
         if scale > 1:
-            def after_read_item(value):
-                return Decimal(value) / (10 ** scale)
+            def after_read_items(items, nulls_map=None):
+                s = 10 ** scale
+                if nulls_map is not None:
+                    items = tuple([
+                      (None if is_null else Decimal(items[i]) / s)
+                      for i, is_null in enumerate(nulls_map)
+                      ])
+
+                else:
+                    items = tuple([Decimal(x) / s for x in items])
+
+                return items
 
             def before_write_item(value):
                 return int(Decimal(value) * (10 ** scale))
 
         else:
-            def after_read_item(value):
-                return Decimal(value)
+            def after_read_items(items, nulls_map=None):
+                if nulls_map is not None:
+                    items = tuple([
+                      (None if is_null else Decimal(items[i]))
+                      for i, is_null in enumerate(nulls_map)
+                      ])
+
+                else:
+                    items = tuple([Decimal(x) for x in items])
+
+                return items
 
             def before_write_item(value):
                 return int(Decimal(value))
 
-        self.after_read_item = after_read_item
+        self.after_read_items = after_read_items
         self.before_write_item = before_write_item
 
     # Override default precision to the maximum supported by underlying type.
