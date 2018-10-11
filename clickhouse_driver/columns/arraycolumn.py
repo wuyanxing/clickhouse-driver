@@ -100,6 +100,8 @@ class ArrayColumn(Column):
             for x in value:
                 self.nested_column._write_data(x, buf)
         else:
+            if not isinstance(value, list):
+                value = list(value)
             self.nested_column._write_data(value, buf)
 
     def _write_nulls_data(self, value, buf):

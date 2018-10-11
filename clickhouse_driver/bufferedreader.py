@@ -145,6 +145,7 @@ class BufferedSocketReader(BufferedReader):
             raise EOFError('Unexpected EOF while reading bytes')
 
 
+# TODO: move to compressed streams
 class CompressedBufferedReader(BufferedReader):
     def __init__(self, read_block, bufsize):
         self.read_block = read_block

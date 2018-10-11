@@ -7,21 +7,42 @@ from .intcolumn import IntColumn
 
 class EnumColumn(IntColumn):
     py_types = (Enum, ) + compat.integer_types + compat.string_types
+    null_value = 0
 
     def __init__(self, enum_cls, **kwargs):
         self.enum_cls = enum_cls
         super(EnumColumn, self).__init__(**kwargs)
 
-    def before_write_item(self, value):
-        source_value = value.name if isinstance(value, Enum) else value
+    def before_write_items(self, items):
         enum_cls = self.enum_cls
+        string_types = compat.string_types
 
         # Check real enum value
         try:
-            if isinstance(source_value, compat.string_types):
-                return enum_cls[source_value].value
+            if self.nullable:
+                null_value = self.null_value
+
+                for i, x in enumerate(items):
+                    if x is not None:
+
+                        if isinstance(x, Enum):
+                            x = x.name
+
+                        if isinstance(x, string_types):
+                            items[i] = enum_cls[x].value
+                        else:
+                            items[i] = enum_cls(x).value
+                    else:
+                        items[i] = null_value
             else:
-                return enum_cls(source_value).value
+                for i, x in enumerate(items):
+                    if isinstance(x, Enum):
+                        x = x.name
+
+                    if isinstance(x, string_types):
+                        items[i] = enum_cls[x].value
+                    else:
+                        items[i] = enum_cls(x).value
 
         except (ValueError, KeyError):
             choices = ', '.join(
@@ -30,8 +51,7 @@ class EnumColumn(IntColumn):
             enum_str = '{}({})'.format(enum_cls.__name__, choices)
 
             raise errors.LogicalError(
-                "Unknown element '{}' for type {}"
-                .format(source_value, enum_str)
+                "Unknown element '{}' for type {}".format(x, enum_str)
             )
 
     def after_read_items(self, items, nulls_map=None):

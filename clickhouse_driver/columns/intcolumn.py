@@ -7,25 +7,48 @@ from .base import FormatColumn
 class IntColumn(FormatColumn):
     py_types = compat.integer_types
     int_size = None
+    null_value = 0
 
     def __init__(self, types_check=False, **kwargs):
         super(IntColumn, self).__init__(types_check=types_check, **kwargs)
 
-        if types_check:
-            self.mask = (1 << 8 * self.int_size) - 1
+    def before_write_items(self, items):
+        if self.types_check_enabled:
+            mask = (1 << 8 * self.int_size) - 1
+            null_value = self.null_value
 
             # Chop only bytes that fit current type.
             # ctypes.c_intXX is slower.
-            def before_write_item(value):
-                if value >= 0:
-                    sign = 1
-                else:
-                    sign = -1
-                    value = -value
 
-                return sign * (value & self.mask)
+            if self.nullable:
+                for i, x in enumerate(items):
+                    if x is not None:
+                        if x >= 0:
+                            sign = 1
+                        else:
+                            sign = -1
+                            x = -x
 
-            self.before_write_item = before_write_item
+                        items[i] = sign * (x & mask)
+                    else:
+                        items[i] = null_value
+
+            else:
+                for i, x in enumerate(items):
+                    if x >= 0:
+                        sign = 1
+                    else:
+                        sign = -1
+                        x = -x
+
+                    items[i] = sign * (x & mask)
+        else:
+            null_value = self.null_value
+
+            if self.nullable:
+                for i, x in enumerate(items):
+                    if x is None:
+                        items[i] = null_value
 
 
 class UIntColumn(IntColumn):
@@ -33,11 +56,12 @@ class UIntColumn(IntColumn):
         super(UIntColumn, self).__init__(types_check=types_check, **kwargs)
 
         if types_check:
-            def check_item(value):
-                if value < 0:
-                    raise ColumnTypeMismatchException(value)
+            def check_items(items):
+                for x in items:
+                    if x is not None and x < 0:
+                        raise ColumnTypeMismatchException(x)
 
-            self.check_item = check_item
+            self.check_items = check_items
 
 
 class Int8Column(IntColumn):

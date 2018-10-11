@@ -10,23 +10,31 @@ from codecs import utf_8_decode, utf_8_encode
 class String(Column):
     ch_type = 'String'
     py_types = compat.string_types
+    null_value = ''
 
     # TODO: pass user encoding here
 
-    def prepare_null(self, value):
-        if self.nullable and value is None:
-            return '', True
+    def write_items(self, items, buf):
+        if self.nullable:
+            null_value = self.null_value
+
+            for x in items:
+                if x is None:
+                    x = null_value
+
+                if not isinstance(x, bytes):
+                    x = utf_8_encode(x)[0]
+
+                write_varint(len(x), buf)
+                buf.write(x)
 
         else:
-            return value, False
+            for x in items:
+                if not isinstance(x, bytes):
+                    x = utf_8_encode(x)[0]
 
-    def write_items(self, items, buf):
-        for value in items:
-            if not isinstance(value, bytes):
-                value = utf_8_encode(value)[0]
-
-            write_varint(len(value), buf)
-            buf.write(value)
+                write_varint(len(x), buf)
+                buf.write(x)
 
     def read_items(self, n_items, buf):
         return buf.read_strings(n_items, decode=True)
@@ -36,9 +44,19 @@ class ByteString(String):
     py_types = (bytearray, bytes)
 
     def write_items(self, items, buf):
-        for value in items:
-            write_varint(len(value), buf)
-            buf.write(value)
+        null_value = self.null_value
+
+        if self.nullable:
+            for x in items:
+                if x is None:
+                    x = null_value
+
+                write_varint(len(x), buf)
+                buf.write(x)
+        else:
+            for x in items:
+                write_varint(len(x), buf)
+                buf.write(x)
 
     def read_items(self, n_items, buf):
         return buf.read_strings(n_items)
@@ -77,16 +95,33 @@ class FixedString(String):
         items_buf_view = memoryview(items_buf)
         buf_pos = 0
 
-        for value in items:
-            if not isinstance(value, bytes):
-                value = utf_8_encode(value)[0]
+        null_value = self.null_value
 
-            value_len = len(value)
-            if length < value_len:
-                raise errors.TooLargeStringSize()
+        if self.nullable:
+            for x in items:
+                if x is None:
+                    x = null_value
 
-            items_buf_view[buf_pos:buf_pos + min(length, value_len)] = value
-            buf_pos += length
+                if not isinstance(x, bytes):
+                    x = utf_8_encode(x)[0]
+
+                value_len = len(x)
+                if length < value_len:
+                    raise errors.TooLargeStringSize()
+
+                items_buf_view[buf_pos:buf_pos + min(length, value_len)] = x
+                buf_pos += length
+        else:
+            for x in items:
+                if not isinstance(x, bytes):
+                    x = utf_8_encode(x)[0]
+
+                value_len = len(x)
+                if length < value_len:
+                    raise errors.TooLargeStringSize()
+
+                items_buf_view[buf_pos:buf_pos + min(length, value_len)] = x
+                buf_pos += length
 
         buf.write(items_buf)
 
@@ -112,13 +147,28 @@ class ByteFixedString(FixedString):
         items_buf_view = memoryview(items_buf)
         buf_pos = 0
 
-        for value in items:
-            value_len = len(value)
-            if length < value_len:
-                raise errors.TooLargeStringSize()
+        if self.nullable:
+            null_value = self.null_value
 
-            items_buf_view[buf_pos:buf_pos + min(length, value_len)] = value
-            buf_pos += length
+            for x in items:
+                if x is None:
+                    x = null_value
+                    value_len = 0
+                else:
+                    value_len = len(x)
+                    if length < value_len:
+                        raise errors.TooLargeStringSize()
+
+                items_buf_view[buf_pos:buf_pos + min(length, value_len)] = x
+                buf_pos += length
+        else:
+            for x in items:
+                value_len = len(x)
+                if length < value_len:
+                    raise errors.TooLargeStringSize()
+
+                items_buf_view[buf_pos:buf_pos + min(length, value_len)] = x
+                buf_pos += length
 
         buf.write(items_buf)
 

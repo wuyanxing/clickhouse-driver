@@ -11,6 +11,7 @@ class DateTimeColumn(FormatColumn):
     ch_type = 'DateTime'
     py_types = (datetime, int)
     format = 'I'
+    null_value = 0
 
     def __init__(self, timezone=None, **kwargs):
         self.timezone = timezone
@@ -31,27 +32,59 @@ class DateTimeColumn(FormatColumn):
 
         return items
 
-    def before_write_item(self, value):
-        if isinstance(value, int):
-            # support supplying raw integers to avoid
-            # costly timezone conversions when using datetime
-            return value
+    def before_write_items(self, items):
+        tz_localize = self.timezone.localize if self.timezone else None
 
-        if self.timezone:
-            # Set server's timezone for offset-naive datetime.
-            if value.tzinfo is None:
-                value = self.timezone.localize(value)
+        if self.nullable:
+            null_value = self.null_value
 
-            value = value.astimezone(utc)
-            return int(timegm(value.timetuple()))
+            for i, x in enumerate(items):
+                if x is not None:
+                    if isinstance(x, int):
+                        # support supplying raw integers to avoid
+                        # costly timezone conversions when using datetime
+                        continue
+
+                    if tz_localize:
+                        # Set server's timezone for offset-naive datetime.
+                        if x.tzinfo is None:
+                            x = tz_localize(x)
+
+                        x = x.astimezone(utc)
+                        items[i] = int(timegm(x.timetuple()))
+
+                    else:
+                        # If datetime is offset-aware use it's timezone.
+                        if x.tzinfo is not None:
+                            x = x.astimezone(utc)
+                            items[i] = int(timegm(x.timetuple()))
+                        else:
+                            items[i] = int(mktime(x.timetuple()))
+                else:
+                    items[i] = null_value
 
         else:
-            # If datetime is offset-aware use it's timezone.
-            if value.tzinfo is not None:
-                value = value.astimezone(utc)
-                return int(timegm(value.timetuple()))
+            for i, x in enumerate(items):
+                if isinstance(x, int):
+                    # support supplying raw integers to avoid
+                    # costly timezone conversions when using datetime
+                    continue
 
-            return int(mktime(value.timetuple()))
+                if tz_localize:
+                    # Set server's timezone for offset-naive datetime.
+                    if x.tzinfo is None:
+                        x = tz_localize(x)
+
+                    x = x.astimezone(utc)
+                    items[i] = int(timegm(x.timetuple()))
+
+                else:
+                    # If datetime is offset-aware use it's timezone.
+                    if x.tzinfo is not None:
+                        x = x.astimezone(utc)
+                        items[i] = int(timegm(x.timetuple()))
+                    else:
+                        items[i] = int(mktime(x.timetuple()))
 
 
 def create_datetime_column(spec, column_options):

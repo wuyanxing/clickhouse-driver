@@ -7,9 +7,9 @@ class Column(object):
     ch_type = None
     py_types = None
 
-    check_item = None
+    check_items = None
     after_read_items = None
-    before_write_item = None
+    before_write_items = None
 
     types_check_enabled = False
 
@@ -30,57 +30,32 @@ class Column(object):
         items = [x is None for x in items]
         buf.write(s.pack(*items))
 
-    def prepare_null(self, value):
-        if self.nullable and value is None:
-            return 0, True
-
-        else:
-            return value, False
-
-    def check_item_type(self, value):
-        if not isinstance(value, self.py_types):
-            raise exceptions.ColumnTypeMismatchException(value)
-
     def prepare_items(self, items):
-        before_write = self.before_write_item
-        prepare_null = self.prepare_null if self.nullable else False
-
-        check_item = self.check_item
         if self.types_check_enabled:
-            check_item_type = self.check_item_type
-        else:
-            check_item_type = False
+            for x in items:
+                if x is not None and not isinstance(x, self.py_types):
+                    raise exceptions.ColumnTypeMismatchException(x)
 
-        prepared = [None] * len(items)
-        for i, x in enumerate(items):
-            if prepare_null:
-                x, is_null = prepare_null(x)
-            else:
-                is_null = False
+        if self.check_items:
+            self.check_items(items)
 
-            if not is_null:
-                if check_item_type:
-                    check_item_type(x)
-
-                if check_item:
-                    check_item(x)
-
-                if before_write:
-                    x = before_write(x)
-
-            prepared[i] = x
-
-        return prepared
+        if self.before_write_items:
+            self.before_write_items(items)
 
     def write_data(self, items, buf):
+        """
+        :param items: list of items
+        :param buf:
+        :return:
+        """
         if self.nullable:
             self._write_nulls_map(items, buf)
 
         self._write_data(items, buf)
 
     def _write_data(self, items, buf):
-        prepared = self.prepare_items(items)
-        self.write_items(prepared, buf)
+        self.prepare_items(items)
+        self.write_items(items, buf)
 
     def write_items(self, items, buf):
         raise NotImplementedError

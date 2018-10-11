@@ -10,6 +10,7 @@ class UUIDColumn(FormatColumn):
     ch_type = 'UUID'
     py_types = compat.string_types + (UUID, )
     format = 'Q'
+    null_value = 0
 
     # UUID is stored by two uint64 numbers.
     def write_items(self, items, buf):
@@ -47,14 +48,28 @@ class UUIDColumn(FormatColumn):
 
         return items
 
-    def before_write_item(self, value):
+    def before_write_items(self, items):
         try:
-            if not isinstance(value, UUID):
-                value = UUID(value)
+            if self.nullable:
+                null_value = self.null_value
+
+                for i, x in enumerate(items):
+                    if x is not None:
+                        if not isinstance(x, UUID):
+                            x = UUID(x)
+
+                        items[i] = x.int
+                    else:
+                        items[i] = null_value
+
+            else:
+                for i, x in enumerate(items):
+                    if not isinstance(x, UUID):
+                        x = UUID(x)
+
+                    items[i] = x.int
 
         except ValueError:
             raise errors.CannotParseUuidError(
-                "Cannot parse uuid '{}'".format(value)
+                "Cannot parse uuid '{}'".format(x)
             )
-
-        return value.int

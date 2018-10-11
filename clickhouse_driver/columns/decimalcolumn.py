@@ -10,6 +10,7 @@ class DecimalColumn(FormatColumn):
     py_types = (Decimal, float) + compat.integer_types
     max_precision = None
     int_size = None
+    null_value = 0
 
     def __init__(self, precision, scale, types_check=False, **kwargs):
         self.precision = precision
@@ -17,49 +18,70 @@ class DecimalColumn(FormatColumn):
         super(DecimalColumn, self).__init__(**kwargs)
 
         if types_check:
-            max_signed_int = (1 << (8 * self.int_size - 1)) - 1
+            max_signed = (1 << (8 * self.int_size - 1)) - 1
 
-            def check_item(value):
-                if value < -max_signed_int or value > max_signed_int:
-                    raise ColumnTypeMismatchException(value)
+            def check_items(items):
+                for x in items:
+                    if x is not None and (x < -max_signed or x > max_signed):
+                        raise ColumnTypeMismatchException(x)
 
-            self.check_item = check_item
+            self.check_items = check_items
 
-        if scale > 1:
-            def after_read_items(items, nulls_map=None):
-                s = 10 ** scale
-                if nulls_map is not None:
-                    items = tuple([
-                      (None if is_null else Decimal(items[i]) / s)
-                      for i, is_null in enumerate(nulls_map)
-                      ])
+    def after_read_items(self, items, nulls_map=None):
+        if self.scale > 1:
+            s = 10 ** self.scale
 
-                else:
-                    items = tuple([Decimal(x) / s for x in items])
+            # todo: inplace replace
+            if nulls_map is not None:
+                items = tuple([
+                  (None if is_null else Decimal(items[i]) / s)
+                  for i, is_null in enumerate(nulls_map)
+                  ])
 
-                return items
+            else:
+                items = tuple([Decimal(x) / s for x in items])
 
-            def before_write_item(value):
-                return int(Decimal(value) * (10 ** scale))
+            return items
+        else:
+            if nulls_map is not None:
+                items = tuple([
+                  (None if is_null else Decimal(items[i]))
+                  for i, is_null in enumerate(nulls_map)
+                  ])
+
+            else:
+                items = tuple([Decimal(x) for x in items])
+
+            return items
+
+    def before_write_items(self, items):
+        null_value = self.null_value
+
+        if self.scale > 1:
+            s = 10 ** self.scale
+
+            if self.nullable:
+                for i, x in enumerate(items):
+                    if x is not None:
+                        items[i] = int(Decimal(x) * s)
+                    else:
+                        items[i] = null_value
+
+            else:
+                for i, x in enumerate(items):
+                    items[i] = int(Decimal(x) * s)
 
         else:
-            def after_read_items(items, nulls_map=None):
-                if nulls_map is not None:
-                    items = tuple([
-                      (None if is_null else Decimal(items[i]))
-                      for i, is_null in enumerate(nulls_map)
-                      ])
+            if self.nullable:
+                for i, x in enumerate(items):
+                    if x is not None:
+                        items[i] = int(Decimal(x))
+                    else:
+                        items[i] = null_value
 
-                else:
-                    items = tuple([Decimal(x) for x in items])
-
-                return items
-
-            def before_write_item(value):
-                return int(Decimal(value))
-
-        self.after_read_items = after_read_items
-        self.before_write_item = before_write_item
+            else:
+                for i, x in enumerate(items):
+                    items[i] = int(Decimal(x))
 
     # Override default precision to the maximum supported by underlying type.
     def _write_data(self, items, buf):
