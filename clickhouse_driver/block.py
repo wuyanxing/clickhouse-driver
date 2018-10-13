@@ -90,24 +90,8 @@ class Block(object):
             return self.data
 
         # Transpose results: columns -> rows.
-        n_columns = self.columns
-        n_rows = self.rows
-
-        flat_data = [None] * n_columns * n_rows
-
-        for j in range(n_columns):
-            column = self.data[j]
-
-            for i in range(n_rows):
-                flat_data[i * n_columns + j] = column[i]
-
-        # Make rows from slices.
-        rv = [None] * n_rows
-        for i in range(n_rows):
-            offset = i * n_columns
-            rv[i] = tuple(flat_data[offset:offset + n_columns])
-
-        return rv
+        data = self.data
+        return [tuple([c[i] for c in data]) for i in range(self.rows)]
 
     def check_row_type(self, row):
         if not isinstance(row, self.supported_row_types):
