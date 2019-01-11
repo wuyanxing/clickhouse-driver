@@ -24,10 +24,13 @@ def escape_param(item):
         return 'NULL'
 
     elif isinstance(item, datetime):
-        return "'%s'" % item.strftime('%Y-%m-%d %H:%M:%S')
+        return "'%04d-%02d-%02d %02d:%02d:%02d'" % (
+            item.year, item.month, item.day,
+            item.hour, item.minute, item.second
+        )
 
     elif isinstance(item, date):
-        return "'%s'" % item.strftime('%Y-%m-%d')
+        return "'%04d-%02d-%02d'" % (item.year, item.month, item.day)
 
     elif isinstance(item, string_types):
         return "'%s'" % ''.join(escape_chars_map.get(c, c) for c in item)

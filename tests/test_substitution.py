@@ -34,33 +34,33 @@ class ParametersSubstitutionTestCase(BaseTestCase):
         self.assertEqual(rv, [(None, )])
 
     def test_date(self):
-        d = date(2017, 10, 16)
+        d = date(2017, 10, 6)
         params = {'x': d}
 
-        self.assert_subst(self.single_tpl, params, "SELECT '2017-10-16'")
+        self.assert_subst(self.single_tpl, params, "SELECT '2017-10-06'")
 
         rv = self.client.execute(self.single_tpl, params)
-        self.assertEqual(rv, [('2017-10-16', )])
+        self.assertEqual(rv, [('2017-10-06', )])
 
         tpl = 'SELECT CAST(%(x)s AS Date)'
-        self.assert_subst(tpl, params, "SELECT CAST('2017-10-16' AS Date)")
+        self.assert_subst(tpl, params, "SELECT CAST('2017-10-06' AS Date)")
 
         rv = self.client.execute(tpl, params)
         self.assertEqual(rv, [(d, )])
 
     def test_datetime(self):
-        dt = datetime(2017, 10, 16, 0, 18, 50)
+        dt = datetime(2017, 10, 6, 0, 18, 50)
         params = {'x': dt}
 
         self.assert_subst(self.single_tpl, params,
-                          "SELECT '2017-10-16 00:18:50'")
+                          "SELECT '2017-10-06 00:18:50'")
 
         rv = self.client.execute(self.single_tpl, params)
-        self.assertEqual(rv, [('2017-10-16 00:18:50', )])
+        self.assertEqual(rv, [('2017-10-06 00:18:50', )])
 
         tpl = 'SELECT CAST(%(x)s AS DateTime)'
         self.assert_subst(tpl, params,
-                          "SELECT CAST('2017-10-16 00:18:50' AS DateTime)")
+                          "SELECT CAST('2017-10-06 00:18:50' AS DateTime)")
 
         rv = self.client.execute(tpl, params)
         self.assertEqual(rv, [(dt, )])
